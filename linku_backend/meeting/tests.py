@@ -1,8 +1,12 @@
 import pytest
 import datetime
-import json
+import os
+
+from django.conf import settings
 from meeting.models import Meeting, User, Comment
 from meeting.serializer import MeetingSerializer
+
+SAVED_TEST_IMAGE_NAME = os.path.join(settings.MEDIA_ROOT, "test_image.jpg")
 
 
 @pytest.mark.django_db
@@ -25,7 +29,8 @@ def test_create_meeting_model():
                            meeting_specific_info='test meeting_specific_info',
                            restaurant_name='test restaurant_name',
                            category='tes category',
-                           specific_link='test specific_link')
+                           specific_link='test specific_link',
+                           main_image=SAVED_TEST_IMAGE_NAME)
     Meeting.objects.get(maker_name='test maker_name')
 
 
@@ -56,7 +61,8 @@ def test_create_comment_model():
 
 @pytest.mark.django_db
 def test_correct_json_data_when_meetings_GET_request(client):
-    meeting1 = Meeting.objects.create(maker_name='test maker_name1',
+    meetings = []
+    meetings.append(Meeting.objects.create(maker_name='test maker_name1',
                                       title='test title1',
                                       start_time=datetime.datetime.now(),
                                       place='test place1',
@@ -66,9 +72,9 @@ def test_correct_json_data_when_meetings_GET_request(client):
                                       meeting_specific_info='test meeting_specific_info1',
                                       restaurant_name='test restaurant_name1',
                                       category='tes category1',
-                                      specific_link='test specific_link1')
+                                      specific_link='test specific_link1'))
 
-    meeting2 = Meeting.objects.create(maker_name='test maker_name2',
+    meetings.append(Meeting.objects.create(maker_name='test maker_name2',
                                       title='test title2',
                                       start_time=datetime.datetime.now(),
                                       place='test place2',
@@ -78,11 +84,18 @@ def test_correct_json_data_when_meetings_GET_request(client):
                                       meeting_specific_info='test meeting_specific_info2',
                                       restaurant_name='test restaurant_name2',
                                       category='tes category2',
-                                      specific_link='test specific_link2')
+                                      specific_link='test specific_link2'))
+
     response = client.get('/meetings/' + "?format=json")
-    meetings = [MeetingSerializer(meeting1).data,
-                MeetingSerializer(meeting2).data]
-    assert response.data == meetings
+
+    for index, meeting in enumerate(meetings):
+        origin_data = MeetingSerializer(meeting).data
+        api_response_data = response.data[index]
+        for key in origin_data.keys():
+            if key == "main_image":
+                assert origin_data[key] in api_response_data[key]
+            else:
+                assert origin_data[key] == api_response_data[key]
 
 
 @pytest.mark.django_db
@@ -100,4 +113,11 @@ def test_correct_json_data_when_meeting_GET_request(client):
                                      specific_link='test specific_link')
 
     response = client.get('/meetings/' + str(meeting.id) + "/?format=json")
-    assert response.data == MeetingSerializer(meeting).data
+
+    origin_data = MeetingSerializer(meeting).data
+    api_response_data = response.data
+    for key in origin_data.keys():
+        if key == "main_image":
+            assert origin_data[key] in api_response_data[key]
+        else:
+            assert origin_data[key] == api_response_data[key]
